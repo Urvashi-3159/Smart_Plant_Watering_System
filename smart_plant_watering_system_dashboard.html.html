@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Smart Plant Watering System</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,sans-serif;background:#f4f7f6;color:#18352d}
+.app{display:flex;min-height:100vh}
+.side{width:220px;background:#123f34;color:white;padding:20px 15px;position:fixed;height:100vh}
+.brand{font-size:20px;font-weight:bold;padding:10px}
+.nav button{display:block;width:100%;text-align:left;background:transparent;color:white;border:0;padding:13px;border-radius:8px;margin:5px 0;cursor:pointer}
+.nav button.active,.nav button:hover{background:#236957}
+.main{margin-left:220px;width:calc(100% - 220px);padding:25px}
+.top{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:20px}
+.top h1{margin:0}
+.online,.badge{background:#e1f5eb;color:#176344;padding:7px 10px;border-radius:20px;font-size:12px;font-weight:bold}
+.page{display:none}.page.active{display:block}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:15px}
+.card{background:white;border-radius:14px;padding:18px;box-shadow:0 4px 15px #0000000d}
+.stat{min-height:120px}
+.label{font-size:12px;color:#75847f}
+.big{font-size:30px;font-weight:bold;margin:12px 0}
+.row{display:grid;grid-template-columns:2fr 1fr;gap:15px;margin-top:18px}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:15px;margin-top:18px}
+.card h2{font-size:18px;margin-top:0}
+.btn{border:0;background:#176b52;color:white;padding:10px 13px;border-radius:8px;font-weight:bold;cursor:pointer;margin:4px}
+.btn.alt{background:#e9f1ee;color:#17483c}
+.btn.warnbtn{background:#b56a00}
+input{padding:9px;border:1px solid #ccd8d4;border-radius:8px;width:70px}
+.progress{height:10px;background:#e6ece9;border-radius:10px;overflow:hidden}
+.progress i{display:block;height:100%;background:#24946f}
+.plant{display:flex;align-items:center;gap:15px}
+.plantpic{font-size:40px}
+.log{max-height:220px;overflow:auto}
+.log p{font-size:13px;border-bottom:1px solid #eee;padding:8px 0}
+.notice,.reminder{padding:12px;background:#eef8f4;border-radius:8px;margin:10px 0}
+.notice{background:#fff0d7;color:#79531a;display:none}
+table{width:100%;border-collapse:collapse}
+td,th{text-align:left;padding:10px;border-bottom:1px solid #eee}
+.flow{display:flex;justify-content:center;gap:10px;flex-wrap:wrap}
+.node{padding:15px;background:#f2faf6;border:1px solid #bcdccf;border-radius:10px;text-align:center}
+@media(max-width:850px){
+.side{width:65px;padding:10px 5px}.brand{font-size:0}
+.nav button{font-size:0;text-align:center}
+.nav button:first-letter{font-size:20px}
+.main{margin-left:65px;width:calc(100% - 65px);padding:12px}
+.grid{grid-template-columns:1fr 1fr}
+.row,.row2{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+<div class="app">
+<aside class="side">
+<div class="brand">🌿 SmartPlant</div>
+<div class="nav">
+<button class="active" onclick="showPage('dashboard',this)">🏠 Dashboard</button>
+<button onclick="showPage('plants',this)">🌱 My Plants</button>
+<button onclick="showPage('watering',this)">💧 Watering</button>
+<button onclick="showPage('analytics',this)">📊 Analytics</button>
+<button onclick="showPage('reminders',this)">🔔 Reminders</button>
+</div>
+</aside>
+
+<main class="main">
+<div class="top">
+<div>
+<h1 id="title">Dashboard</h1>
+<p>Smart plant monitoring and automatic watering control</p>
+</div>
+<div>
+<button class="btn" onclick="connectArduino()">Connect Arduino</button>
+<div class="online" id="connectionStatus">SIMULATION MODE</div>
+</div>
+</div>
+
+<section id="dashboard" class="page active">
+<div id="notice" class="notice"></div>
+<div class="grid">
+<div class="card stat"><div class="label">SOIL MOISTURE</div><div class="big" id="moisture">45%</div><span class="badge" id="health">Healthy</span></div>
+<div class="card stat"><div class="label">PUMP STATUS</div><div class="big" id="pump">OFF</div><span class="badge" id="pumpBadge">Normal</span></div>
+<div class="card stat"><div class="label">WATER REQUIRED</div><div class="big" id="waterReq">NO</div></div>
+<div class="card stat"><div class="label">PLANT GROWTH</div><div class="big">72%</div><span class="badge">Demo value</span></div>
+</div>
+
+<div class="row">
+<div class="card">
+<h2>🌱 Current Plant</h2>
+<div class="plant"><div class="plantpic">🪴</div><div><b>Money Plant</b><p class="label">Indoor • Plant ID: PL-001</p></div></div>
+<hr>
+<div class="label">MOISTURE LEVEL</div>
+<div class="progress"><i id="bar" style="width:45%"></i></div>
+<p>Threshold: <b id="thresholdText">30%</b></p>
+<button class="btn" onclick="simulate(18)">Simulate Dry Soil</button>
+<button class="btn alt" onclick="simulate(45)">Normal</button>
+<button class="btn alt" onclick="simulate(75)">Simulate Wet Soil</button>
+<button class="btn warnbtn" onclick="waterPlant()">💧 Water Plant</button>
+</div>
+<div class="card">
+<h2>⚙️ Control Settings</h2>
+<p class="label">DISPLAY THRESHOLD</p>
+<input id="threshold" type="number" min="1" max="99" value="30" onchange="render()"><span>%</span>
+<p>Mode: <span class="badge" id="modeBadge">Simulation</span></p>
+<p>Sensor: <span class="badge" id="sensorBadge">Not connected</span></p>
+<p>Last check: <b id="lastCheck">--</b></p>
+<div class="reminder">Sensor readings refresh automatically when connected.</div>
+</div>
+</div>
+<div class="row2">
+<div class="card"><h2>System Workflow</h2><div class="flow"><div class="node">🌱<br>Sensor</div>→<div class="node">🧠<br>Arduino</div>→<div class="node">⚡<br>Relay</div>→<div class="node">💧<br>Pump</div></div></div>
+<div class="card"><h2>Recent Activity</h2><div class="log" id="log"></div></div>
+</div>
+</section>
+
+<section id="plants" class="page">
+<div class="card"><h2>🌱 My Plants</h2>
+<table><thead><tr><th>Plant</th><th>Location</th><th>Moisture</th><th>Status</th></tr></thead>
+<tbody><tr><td>Money Plant</td><td>Indoor</td><td id="tableMoist">45%</td><td id="tableStatus">Healthy</td></tr>
+<tr><td>Aloe Vera</td><td>Balcony</td><td>Demo</td><td>Healthy</td></tr></tbody></table>
+</div>
+</section>
+
+<section id="watering" class="page">
+<div class="grid">
+<div class="card stat"><div class="label">PUMP</div><div class="big" id="pump2">OFF</div></div>
+<div class="card stat"><div class="label">WATERING EVENTS</div><div class="big" id="events">0</div></div>
+<div class="card stat"><div class="label">MODE</div><div class="big">AUTO</div></div>
+<div class="card stat"><div class="label">SENSOR</div><div class="big" id="sensorState">--</div></div>
+</div>
+<div class="card" style="margin-top:18px">
+<h2>💧 Watering Control</h2>
+<p id="controlDescription">Connect Arduino for real hardware control.</p>
+<button class="btn" onclick="waterPlant()">Start Watering</button>
+<button class="btn alt" onclick="stopPump()">Stop Pump</button>
+<div class="reminder" id="waterMessage">Pump is currently OFF.</div>
+</div>
+</section>
+
+<section id="analytics" class="page">
+<div class="row">
+<div class="card"><h2>Moisture Trend</h2><canvas id="chart" height="180"></canvas></div>
+<div class="card"><h2>Summary</h2><p>Current moisture: <b id="summaryMoisture">45%</b></p><p>Watering events: <b id="events2">0</b></p><p>Start threshold: 30%</p><p>Control: Automatic</p></div>
+</div>
+</section>
+
+<section id="reminders" class="page">
+<div class="card"><h2>🔔 Reminders</h2>
+<div class="reminder">Check that the sensor is inserted correctly into the soil.</div>
+<div class="reminder">Ensure the water reservoir contains water.</div>
+<div class="reminder">Check pump tubing and power supply regularly.</div>
+</div>
+</section>
+</main>
+</div>
+
+<script>
+let moisture=45,events=0,history=[42,48,46,52,45,39,45];
+let hardwareConnected=false,actualPumpOn=false,waterRequired=false,sensorFault=false;
+let serialPort=null,serialWriter=null,chart=null;
+
+function log(message){
+const box=document.getElementById('log');
+box.innerHTML='<p>• '+new Date().toLocaleTimeString()+' — '+message+'</p>'+box.innerHTML;
+}
+function render(){
+const threshold=Number(document.getElementById('threshold').value)||30;
+const dry=hardwareConnected?waterRequired:moisture<threshold;
+const pump=hardwareConnected?actualPumpOn:dry;
+document.getElementById('moisture').textContent=moisture+'%';
+document.getElementById('summaryMoisture').textContent=moisture+'%';
+document.getElementById('bar').style.width=moisture+'%';
+document.getElementById('health').textContent=sensorFault?'Sensor Fault':(dry?'Needs Water':'Healthy');
+document.getElementById('pump').textContent=pump?'ON':'OFF';
+document.getElementById('pump2').textContent=pump?'ON':'OFF';
+document.getElementById('pumpBadge').textContent=sensorFault?'Safety Stop':(pump?'Watering':'Normal');
+document.getElementById('waterReq').textContent=sensorFault?'CHECK SENSOR':(dry?'YES':'NO');
+document.getElementById('tableMoist').textContent=moisture+'%';
+document.getElementById('tableStatus').textContent=sensorFault?'Sensor Fault':(dry?'Needs Water':'Healthy');
+document.getElementById('thresholdText').textContent=threshold+'%';
+document.getElementById('lastCheck').textContent=new Date().toLocaleTimeString();
+document.getElementById('modeBadge').textContent=hardwareConnected?'Live Arduino':'Simulation';
+document.getElementById('sensorBadge').textContent=hardwareConnected?(sensorFault?'Fault detected':'Connected'):'Not connected';
+document.getElementById('sensorState').textContent=sensorFault?'FAULT':(hardwareConnected?'OK':'OFFLINE');
+document.getElementById('connectionStatus').textContent=hardwareConnected?'ARDUINO CONNECTED':'SIMULATION MODE';
+document.getElementById('controlDescription').textContent=hardwareConnected?'Live sensor and pump control active.':'Simulation only until Arduino is connected.';
+document.getElementById('notice').style.display=(dry||sensorFault)?'block':'none';
+document.getElementById('notice').textContent=sensorFault?'Sensor fault: pump stopped for safety.':(dry?'Soil moisture is low. Watering may be required.':'');
+document.getElementById('events').textContent=events;
+document.getElementById('events2').textContent=events;
+}
+function updateChart(value){
+if(!chart)return;
+chart.data.labels.push(new Date().toLocaleTimeString());
+chart.data.datasets[0].data.push(value);
+if(chart.data.labels.length>12){chart.data.labels.shift();chart.data.datasets[0].data.shift();}
+chart.update('none');
+}
+function simulate(value){
+if(hardwareConnected){log('Simulation disabled while Arduino is connected.');return;}
+moisture=value;render();updateChart(value);
+log('Simulation moisture set to '+value+'%.');
+}
+async function sendCommand(command){
+if(!hardwareConnected||!serialWriter){log('Connect Arduino first.');return;}
+try{await serialWriter.write(new TextEncoder().encode(command+'\n'));log('Sent command: '+command);}
+catch(error){log('Command failed: '+error.message);}
+}
+async function waterPlant(){
+if(hardwareConnected){
+await sendCommand('WATER');
+document.getElementById('waterMessage').textContent='Water request sent. Arduino safety checks remain active.';
+}else{
+log('Simulation only: no real pump controlled.');
+document.getElementById('waterMessage').textContent='Simulation mode only. Connect Arduino to control the real pump.';
+}
+}
+async function stopPump(){
+if(hardwareConnected){
+await sendCommand('STOP');
+document.getElementById('waterMessage').textContent='Stop request sent to Arduino.';
+}else{
+actualPumpOn=false;render();
+document.getElementById('waterMessage').textContent='Simulation: no physical pump is connected.';
+}
+}
+async function connectArduino(){
+if(!('serial' in navigator)){
+alert('Web Serial needs a recent desktop Chrome or Edge browser. If opening this file directly fails, run it through localhost using VS Code Live Server.');
+return;
+}
+try{
+serialPort=await navigator.serial.requestPort();
+await serialPort.open({baudRate:9600});
+serialWriter=serialPort.writable.getWriter();
+hardwareConnected=true;render();log('Arduino connected.');
+const decoder=new TextDecoderStream();
+serialPort.readable.pipeTo(decoder.writable).catch(()=>{});
+const reader=decoder.readable.getReader();
+let buffer='';
+while(true){
+const result=await reader.read();
+if(result.done)break;
+buffer+=result.value;
+const lines=buffer.split('\n');buffer=lines.pop();
+for(const line of lines){
+const text=line.trim();if(!text)continue;
+try{
+const data=JSON.parse(text);
+if(typeof data.moisturePercent==='number')moisture=Math.max(0,Math.min(100,Math.round(data.moisturePercent)));
+if(typeof data.pumpOn==='boolean')actualPumpOn=data.pumpOn;
+if(typeof data.waterRequired==='boolean')waterRequired=data.waterRequired;
+if(typeof data.sensorFault==='boolean')sensorFault=data.sensorFault;
+if(typeof data.events==='number')events=data.events;
+render();updateChart(moisture);
+}catch(error){/* Ignore non-JSON startup messages. */}
+}
+}
+}catch(error){
+hardwareConnected=false;render();
+log('Connection failed: '+error.message);
+alert('Connection failed. Check USB, select the correct port, and close Arduino Serial Monitor first. '+error.message);
+}
+}
+function showPage(id,button){
+document.querySelectorAll('.page').forEach(page=>page.classList.remove('active'));
+document.getElementById(id).classList.add('active');
+document.querySelectorAll('.nav button').forEach(b=>b.classList.remove('active'));
+button.classList.add('active');
+document.getElementById('title').textContent=button.textContent.trim();
+}
+render();
+log('Frontend started in simulation mode.');
+chart=new Chart(document.getElementById('chart'),{
+type:'line',
+data:{labels:['10:00','10:10','10:20','10:30','10:40','10:50','Now'],
+datasets:[{label:'Moisture %',data:history,borderWidth:2,tension:.35}]},
+options:{plugins:{legend:{display:false}},scales:{y:{min:0,max:100}}}
+});
+</script>
+</body>
+</html>
